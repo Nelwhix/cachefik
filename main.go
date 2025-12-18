@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/Nelwhix/cachefik/internal/cache"
 )
 
 func main() {
@@ -18,6 +20,7 @@ func main() {
 		Client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
+		Cache: cache.NewMemoryCache(),
 	}
 
 	server := &http.Server{

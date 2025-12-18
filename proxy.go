@@ -5,14 +5,27 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
+
+	"github.com/Nelwhix/cachefik/internal/cache"
 )
 
 type Proxy struct {
 	Upstream string
 	Client   *http.Client
+	Cache    cache.Cache
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if p.Cache != nil && cache.CanCacheRequest(r) {
+		key := cache.Key(r)
+
+		if entry, ok := p.Cache.Get(key); ok {
+			cache.WriteCachedResponse(w, entry)
+			return
+		}
+	}
+
 	upstreamURL, err := url.Parse(p.Upstream)
 	if err != nil {
 		http.Error(w, "bad upstream", http.StatusInternalServerError)
@@ -27,8 +40,28 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "read error", http.StatusBadGateway)
+		return
+	}
+
 	copyHeaders(w.Header(), resp.Header)
 	removeHopByHopHeaders(w.Header())
+
+	if p.Cache != nil {
+		if ttl, ok := cache.CanCacheResponse(resp); ok && cache.CanCacheRequest(r) {
+			p.Cache.Set(cache.Key(r), cache.Entry{
+				StatusCode: resp.StatusCode,
+				Header:     resp.Header,
+				Body:       body,
+				ExpiresAt:  time.Now().Add(ttl),
+			})
+			w.Header().Set("X-Cache", "MISS")
+		} else {
+			w.Header().Set("X-Cache", "BYPASS")
+		}
+	}
 
 	w.WriteHeader(resp.StatusCode)
 	io.Copy(w, resp.Body)
