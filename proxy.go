@@ -64,7 +64,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	w.Write(body)
 }
 
 func (p *Proxy) cloneRequest(r *http.Request, upstream *url.URL) *http.Request {
