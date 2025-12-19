@@ -3,13 +3,25 @@ package main
 import (
 	"log"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/Nelwhix/cachefik/internal/cache"
+	"github.com/Nelwhix/cachefik/internal/provider/docker"
 )
 
 func main() {
+	services, err := docker.DiscoverServices()
+	sort.Slice(services, func(i, j int) bool {
+		return len(parsePrefix(services[i].Rule)) >
+			len(parsePrefix(services[j].Rule))
+	})
+
+	if err != nil {
+		log.Fatalf("docker discovery failed: %v", err)
+	}
 	handler := &Proxy{
+		Services: services,
 		Client: &http.Client{
 			Timeout: 10 * time.Second,
 		},

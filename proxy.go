@@ -5,16 +5,17 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/Nelwhix/cachefik/internal/cache"
+	"github.com/Nelwhix/cachefik/internal/provider/docker"
 )
 
 type Proxy struct {
-	Client *http.Client
-	Cache  cache.Cache
+	Services []docker.Service
+	Client   *http.Client
+	Cache    cache.Cache
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -27,12 +28,13 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	upstreamURL, err := url.Parse(pickUpstream(r))
-	if err != nil {
-		http.Error(w, "bad upstream", http.StatusInternalServerError)
+	target := p.pickUpstream(r)
+	if target == "" {
+		http.Error(w, "no upstream found", http.StatusNotFound)
 		return
 	}
 
+	upstreamURL, _ := url.Parse(target)
 	outRequest := p.cloneRequest(r, upstreamURL)
 	resp, err := p.Client.Do(outRequest)
 	if err != nil {
@@ -84,10 +86,16 @@ func (p *Proxy) cloneRequest(r *http.Request, upstream *url.URL) *http.Request {
 	return outRequest
 }
 
-func pickUpstream(r *http.Request) string {
-	if strings.HasPrefix(r.URL.Path, "/api") {
-		return os.Getenv("UPSTREAM_BACKEND")
+func (p *Proxy) pickUpstream(r *http.Request) string {
+	for _, svc := range p.Services {
+		if strings.HasPrefix(r.URL.Path, parsePrefix(svc.Rule)) {
+			return svc.Upstream
+		}
 	}
 
-	return os.Getenv("UPSTREAM_FRONTEND")
+	return ""
+}
+
+func parsePrefix(rule string) string {
+	return strings.TrimSuffix(strings.TrimPrefix(rule, "PathPrefix(`"), "`)")
 }

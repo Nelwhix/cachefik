@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Nelwhix/cachefik/internal/cache"
+	"github.com/Nelwhix/cachefik/internal/provider/docker"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,10 +23,10 @@ func TestProxyIntegration(t *testing.T) {
 	}))
 	defer backend.Close()
 
-	t.Setenv("UPSTREAM_FRONTEND", backend.URL)
-	t.Setenv("UPSTREAM_BACKEND", backend.URL)
-
 	proxy := &Proxy{
+		Services: []docker.Service{
+			{Rule: "PathPrefix(`/`)", Upstream: backend.URL},
+		},
 		Client: &http.Client{},
 		Cache:  cache.NewMemoryCache(),
 	}
@@ -75,10 +76,10 @@ func TestProxyIntegration(t *testing.T) {
 		}))
 		defer backend.Close()
 
-		t.Setenv("UPSTREAM_FRONTEND", backend.URL)
-		t.Setenv("UPSTREAM_BACKEND", backend.URL)
-
 		p := &Proxy{
+			Services: []docker.Service{
+				{Rule: "PathPrefix(`/`)", Upstream: backend.URL},
+			},
 			Client: &http.Client{},
 			Cache:  cache.NewMemoryCache(),
 		}
@@ -112,10 +113,10 @@ func TestProxyIntegration(t *testing.T) {
 		}))
 		defer backend.Close()
 
-		t.Setenv("UPSTREAM_FRONTEND", backend.URL)
-		t.Setenv("UPSTREAM_BACKEND", backend.URL)
-
 		p := &Proxy{
+			Services: []docker.Service{
+				{Rule: "PathPrefix(`/`)", Upstream: backend.URL},
+			},
 			Client: &http.Client{},
 			Cache:  cache.NewMemoryCache(),
 		}
