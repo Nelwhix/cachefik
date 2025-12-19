@@ -1,0 +1,28 @@
+services:
+  proxy:
+    build: .
+    container_name: cache-proxy
+    ports:
+      - "8000:8000"
+    environment:
+      - UPSTREAM_FRONTEND=http://frontend:8080
+      - UPSTREAM_BACKEND=http://backend:8080
+    depends_on:
+      - frontend
+      - backend
+
+  frontend:
+    image: golang:1.22-alpine
+    container_name: demo-frontend
+    working_dir: /app
+    volumes:
+      - ./demo/frontend:/app
+    command: go run main.go
+
+  backend:
+    image: golang:1.22-alpine
+    container_name: demo-backend
+    working_dir: /app
+    volumes:
+      - ./demo/backend:/app
+    command: go run main.go

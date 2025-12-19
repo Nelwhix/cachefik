@@ -22,10 +22,12 @@ func TestProxyIntegration(t *testing.T) {
 	}))
 	defer backend.Close()
 
+	t.Setenv("UPSTREAM_FRONTEND", backend.URL)
+	t.Setenv("UPSTREAM_BACKEND", backend.URL)
+
 	proxy := &Proxy{
-		Upstream: backend.URL,
-		Client:   &http.Client{},
-		Cache:    cache.NewMemoryCache(),
+		Client: &http.Client{},
+		Cache:  cache.NewMemoryCache(),
 	}
 
 	t.Run("Cache MISS then HIT", func(t *testing.T) {
@@ -73,10 +75,12 @@ func TestProxyIntegration(t *testing.T) {
 		}))
 		defer backend.Close()
 
+		t.Setenv("UPSTREAM_FRONTEND", backend.URL)
+		t.Setenv("UPSTREAM_BACKEND", backend.URL)
+
 		p := &Proxy{
-			Upstream: backend.URL,
-			Client:   &http.Client{},
-			Cache:    cache.NewMemoryCache(),
+			Client: &http.Client{},
+			Cache:  cache.NewMemoryCache(),
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/expire", nil)
@@ -108,10 +112,12 @@ func TestProxyIntegration(t *testing.T) {
 		}))
 		defer backend.Close()
 
+		t.Setenv("UPSTREAM_FRONTEND", backend.URL)
+		t.Setenv("UPSTREAM_BACKEND", backend.URL)
+
 		p := &Proxy{
-			Upstream: backend.URL,
-			Client:   &http.Client{},
-			Cache:    cache.NewMemoryCache(),
+			Client: &http.Client{},
+			Cache:  cache.NewMemoryCache(),
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/headers", nil)

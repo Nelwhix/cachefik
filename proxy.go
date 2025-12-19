@@ -5,15 +5,16 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/Nelwhix/cachefik/internal/cache"
 )
 
 type Proxy struct {
-	Upstream string
-	Client   *http.Client
-	Cache    cache.Cache
+	Client *http.Client
+	Cache  cache.Cache
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +27,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	upstreamURL, err := url.Parse(p.Upstream)
+	upstreamURL, err := url.Parse(pickUpstream(r))
 	if err != nil {
 		http.Error(w, "bad upstream", http.StatusInternalServerError)
 		return
@@ -81,4 +82,12 @@ func (p *Proxy) cloneRequest(r *http.Request, upstream *url.URL) *http.Request {
 	addForwardedHeaders(outRequest)
 
 	return outRequest
+}
+
+func pickUpstream(r *http.Request) string {
+	if strings.HasPrefix(r.URL.Path, "/api") {
+		return os.Getenv("UPSTREAM_BACKEND")
+	}
+
+	return os.Getenv("UPSTREAM_FRONTEND")
 }
