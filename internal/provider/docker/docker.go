@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strconv"
 
@@ -71,6 +72,7 @@ func listServices(ctx context.Context, cli client.ContainerAPIClient) ([]Service
 		}
 
 		upstream := fmt.Sprintf("http://%s:%d", ip, port)
+		slog.Debug("discovered service", "rule", rule, "upstream", upstream)
 		services = append(services, Service{
 			Rule:     rule,
 			Upstream: upstream,

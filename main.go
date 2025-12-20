@@ -2,7 +2,10 @@ package main
 
 import (
 	"log"
+	"log/slog"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/Nelwhix/cachefik/internal/cache"
 	"github.com/Nelwhix/cachefik/internal/config"
@@ -11,9 +14,27 @@ import (
 
 func main() {
 	cfg := config.New()
+
+	var level slog.Level
+	switch strings.ToLower(cfg.LogLevel) {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo
+	}
+
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
+	slog.SetDefault(logger)
+	slog.Info("Starting Cachefik", "addr", cfg.Addr, "log_level", cfg.LogLevel)
+
 	services, err := docker.DiscoverServices(cfg.DockerHost, cfg.DockerVersion)
 	if err != nil {
-		log.Fatalf("docker discovery failed: %v", err)
+		slog.Error("Docker discovery failed", "error", err)
+		os.Exit(1)
 	}
 
 	handler := &Proxy{
@@ -31,6 +52,5 @@ func main() {
 		WriteTimeout: cfg.WriteTimeout,
 	}
 
-	log.Printf("Starting server on %s", cfg.Addr)
 	log.Fatal(server.ListenAndServe())
 }

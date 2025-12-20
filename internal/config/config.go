@@ -12,6 +12,7 @@ type Config struct {
 	ProxyTimeout  time.Duration
 	DockerHost    string
 	DockerVersion string
+	LogLevel      string
 }
 
 func New() *Config {
@@ -22,6 +23,7 @@ func New() *Config {
 		ProxyTimeout:  getDurationEnv("CACHEFIK_PROXY_TIMEOUT", 10*time.Second),
 		DockerHost:    getEnv("CACHEFIK_DOCKER_HOST", ""),
 		DockerVersion: getEnv("CACHEFIK_DOCKER_VERSION", ""),
+		LogLevel:      getEnv("CACHEFIK_LOG_LEVEL", "info"),
 	}
 }
 

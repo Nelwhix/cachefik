@@ -15,6 +15,7 @@ services:
       - CACHEFIK_WRITE_TIMEOUT=15s
       - CACHEFIK_PROXY_TIMEOUT=20s
       - CACHEFIK_DOCKER_HOST=unix:///var/run/docker.sock
+      - CACHEFIK_LOG_LEVEL=debug
 
   frontend:
     image: golang:1.22-alpine

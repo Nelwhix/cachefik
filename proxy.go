@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -19,6 +20,8 @@ type Proxy struct {
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	logger := slog.With("method", r.Method, "path", r.URL.Path, "remote_addr", r.RemoteAddr)
+
 	if p.Cache != nil && cache.CanCacheRequest(r) {
 		key := cache.Key(r)
 
@@ -30,14 +33,18 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	target := p.pickUpstream(r)
 	if target == "" {
+		logger.Warn("no upstream found")
 		http.Error(w, "no upstream found", http.StatusNotFound)
 		return
 	}
+
+	logger = logger.With("upstream", target)
 
 	upstreamURL, _ := url.Parse(target)
 	outRequest := p.cloneRequest(r, upstreamURL)
 	resp, err := p.Client.Do(outRequest)
 	if err != nil {
+		logger.Error("upstream request failed", "error", err)
 		http.Error(w, "upstream error", http.StatusInternalServerError)
 		return
 	}
