@@ -10,8 +10,18 @@ import (
 	"github.com/docker/docker/client"
 )
 
-func DiscoverServices() ([]Service, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+func DiscoverServices(host string, version string) ([]Service, error) {
+	opts := []client.Opt{
+		client.FromEnv,
+	}
+	if host != "" {
+		opts = append(opts, client.WithHost(host))
+	}
+	if version != "" {
+		opts = append(opts, client.WithVersion(version))
+	}
+
+	cli, err := client.NewClientWithOpts(opts...)
 	if err != nil {
 		return nil, err
 	}

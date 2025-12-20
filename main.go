@@ -3,14 +3,15 @@ package main
 import (
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/Nelwhix/cachefik/internal/cache"
+	"github.com/Nelwhix/cachefik/internal/config"
 	"github.com/Nelwhix/cachefik/internal/provider/docker"
 )
 
 func main() {
-	services, err := docker.DiscoverServices()
+	cfg := config.New()
+	services, err := docker.DiscoverServices(cfg.DockerHost, cfg.DockerVersion)
 	if err != nil {
 		log.Fatalf("docker discovery failed: %v", err)
 	}
@@ -18,18 +19,18 @@ func main() {
 	handler := &Proxy{
 		Services: services,
 		Client: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: cfg.ProxyTimeout,
 		},
 		Cache: cache.NewMemoryCache(),
 	}
 
 	server := &http.Server{
-		Addr:         ":8000",
+		Addr:         cfg.Addr,
 		Handler:      handler,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  cfg.ReadTimeout,
+		WriteTimeout: cfg.WriteTimeout,
 	}
 
-	log.Println("Starting server on port 8080")
+	log.Printf("Starting server on %s", cfg.Addr)
 	log.Fatal(server.ListenAndServe())
 }

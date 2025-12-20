@@ -3,12 +3,18 @@ services:
     build: .
     container_name: cache-proxy
     ports:
-      - "8000:8000"
+      - "8080:8080"
     depends_on:
       - frontend
       - backend
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CACHEFIK_ADDR=:8080
+      - CACHEFIK_READ_TIMEOUT=15s
+      - CACHEFIK_WRITE_TIMEOUT=15s
+      - CACHEFIK_PROXY_TIMEOUT=20s
+      - CACHEFIK_DOCKER_HOST=unix:///var/run/docker.sock
 
   frontend:
     image: golang:1.22-alpine
