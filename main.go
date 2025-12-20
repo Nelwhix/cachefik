@@ -47,7 +47,8 @@ func main() {
 		Client: &http.Client{
 			Timeout: cfg.ProxyTimeout,
 		},
-		Cache: cache.NewMemoryCache(),
+		Cache:        cache.NewMemoryCache(),
+		MaxCacheSize: cfg.MaxCacheSize,
 	}
 
 	server := &http.Server{

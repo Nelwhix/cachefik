@@ -27,8 +27,9 @@ func TestProxyIntegration(t *testing.T) {
 		Services: []docker.Service{
 			{Rule: "PathPrefix(`/`)", Upstream: backend.URL},
 		},
-		Client: &http.Client{},
-		Cache:  cache.NewMemoryCache(),
+		Client:       &http.Client{},
+		Cache:        cache.NewMemoryCache(),
+		MaxCacheSize: 1024 * 1024,
 	}
 
 	t.Run("Cache MISS then HIT", func(t *testing.T) {
@@ -106,8 +107,9 @@ func TestProxyIntegration(t *testing.T) {
 			Services: []docker.Service{
 				{Rule: "PathPrefix(`/`)", Upstream: backend.URL},
 			},
-			Client: &http.Client{},
-			Cache:  cache.NewMemoryCache(),
+			Client:       &http.Client{},
+			Cache:        cache.NewMemoryCache(),
+			MaxCacheSize: 1024 * 1024,
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/expire", nil)
@@ -143,8 +145,9 @@ func TestProxyIntegration(t *testing.T) {
 			Services: []docker.Service{
 				{Rule: "PathPrefix(`/`)", Upstream: backend.URL},
 			},
-			Client: &http.Client{},
-			Cache:  cache.NewMemoryCache(),
+			Client:       &http.Client{},
+			Cache:        cache.NewMemoryCache(),
+			MaxCacheSize: 1024 * 1024,
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/headers", nil)
@@ -156,5 +159,37 @@ func TestProxyIntegration(t *testing.T) {
 		assert.Equal(t, "value", capturedHeader.Get("X-Custom"))
 		assert.Equal(t, "1.2.3.4", capturedHeader.Get("X-Forwarded-For"))
 		assert.Equal(t, "http", capturedHeader.Get("X-Forwarded-Proto"))
+	})
+
+	t.Run("Large Response (No Cache)", func(t *testing.T) {
+		backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write(make([]byte, 2000)) // 2000 bytes
+		}))
+		defer backend.Close()
+
+		p := &Proxy{
+			Services: []docker.Service{
+				{Rule: "PathPrefix(`/`)", Upstream: backend.URL},
+			},
+			Client:       &http.Client{},
+			Cache:        cache.NewMemoryCache(),
+			MaxCacheSize: 1000, // Limit 1000 bytes
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/large", nil)
+		w := httptest.NewRecorder()
+
+		// First request - MISS (too large to cache)
+		p.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "MISS", w.Header().Get("X-Cache"))
+		assert.Equal(t, 2000, len(w.Body.Bytes()))
+
+		// Second request - MISS (should not be in cache)
+		w = httptest.NewRecorder()
+		p.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "MISS", w.Header().Get("X-Cache"))
 	})
 }

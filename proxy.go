@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"log/slog"
@@ -14,9 +15,10 @@ import (
 )
 
 type Proxy struct {
-	Services []docker.Service
-	Client   *http.Client
-	Cache    cache.Cache
+	Services     []docker.Service
+	Client       *http.Client
+	Cache        cache.Cache
+	MaxCacheSize int64
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -50,23 +52,22 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		sendJSONError(w, "read error", http.StatusBadGateway)
-		return
+	ttl, ok := cache.CanCacheResponse(resp)
+	canCache := ok && p.Cache != nil && cache.CanCacheRequest(r)
+
+	var buf bytes.Buffer
+	var bodyWriter = io.Discard
+	var lw *limitedWriter
+	if canCache {
+		lw = &limitedWriter{W: &buf, Limit: p.MaxCacheSize}
+		bodyWriter = lw
 	}
 
 	copyHeaders(w.Header(), resp.Header)
 	removeHopByHopHeaders(w.Header())
 
 	if p.Cache != nil {
-		if ttl, ok := cache.CanCacheResponse(resp); ok && cache.CanCacheRequest(r) {
-			p.Cache.Set(cache.Key(r), cache.Entry{
-				StatusCode: resp.StatusCode,
-				Header:     resp.Header,
-				Body:       body,
-				ExpiresAt:  time.Now().Add(ttl),
-			})
+		if canCache {
 			w.Header().Set("X-Cache", "MISS")
 		} else {
 			w.Header().Set("X-Cache", "BYPASS")
@@ -74,7 +75,23 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(resp.StatusCode)
-	w.Write(body)
+
+	tee := io.TeeReader(resp.Body, bodyWriter)
+	_, err = io.Copy(w, tee)
+	if err != nil {
+		// Too late to send an error to the client as headers/status are already sent
+		logger.Error("streaming failed", "error", err)
+		return
+	}
+
+	if canCache && !lw.Exceeded {
+		p.Cache.Set(cache.Key(r), cache.Entry{
+			StatusCode: resp.StatusCode,
+			Header:     resp.Header,
+			Body:       buf.Bytes(),
+			ExpiresAt:  time.Now().Add(ttl),
+		})
+	}
 }
 
 func (p *Proxy) cloneRequest(r *http.Request, upstream *url.URL) *http.Request {
@@ -101,4 +118,29 @@ func (p *Proxy) pickUpstream(r *http.Request) string {
 	}
 
 	return ""
+}
+
+type limitedWriter struct {
+	W        io.Writer
+	Limit    int64
+	Written  int64
+	Exceeded bool
+}
+
+func (lw *limitedWriter) Write(p []byte) (n int, err error) {
+	if lw.Exceeded {
+		return len(p), nil
+	}
+
+	remaining := lw.Limit - lw.Written
+	if int64(len(p)) > remaining {
+		lw.Exceeded = true
+		n, _ = lw.W.Write(p[:remaining])
+		lw.Written += int64(n)
+		return len(p), nil
+	}
+
+	n, err = lw.W.Write(p)
+	lw.Written += int64(n)
+	return n, err
 }
