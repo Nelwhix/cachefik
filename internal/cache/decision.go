@@ -28,25 +28,24 @@ func CanCacheRequest(r *http.Request) bool {
 
 func CanCacheResponse(resp *http.Response) (time.Duration, bool) {
 	cc := resp.Header.Get("Cache-Control")
-	if strings.Contains(cc, "no-store") {
+
+	if strings.Contains(cc, "no-store") || strings.Contains(cc, "private") {
 		return 0, false
 	}
 
-	if strings.Contains(cc, "private") {
-		return 0, false
-	}
-
-	if strings.Contains(cc, "max-age") {
-		parts := strings.Split(cc, ",")
-		for _, p := range parts {
-			p = strings.TrimSpace(p)
-			if strings.HasPrefix(p, "max-age=") {
-				secs, err := strconv.Atoi(strings.TrimPrefix(p, "max-age="))
-				if err == nil && secs > 0 {
-					return time.Duration(secs) * time.Second, true
-				}
-			}
+	for _, part := range strings.Split(cc, ",") {
+		part = strings.TrimSpace(part)
+		value, ok := strings.CutPrefix(part, "max-age=")
+		if !ok {
+			continue
 		}
+
+		secs, err := strconv.Atoi(value)
+		if err != nil || secs <= 0 {
+			return 0, false
+		}
+
+		return time.Duration(secs) * time.Second, true
 	}
 
 	return defaultTTL, true

@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 
 	"github.com/docker/docker/api/types/container"
@@ -65,6 +66,10 @@ func listServices(ctx context.Context, cli client.ContainerAPIClient) ([]Service
 			Upstream: upstream,
 		})
 	}
+
+	sort.Slice(services, func(i, j int) bool {
+		return len(services[i].PathPrefix()) > len(services[j].PathPrefix())
+	})
 
 	return services, nil
 }

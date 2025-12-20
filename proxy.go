@@ -88,14 +88,10 @@ func (p *Proxy) cloneRequest(r *http.Request, upstream *url.URL) *http.Request {
 
 func (p *Proxy) pickUpstream(r *http.Request) string {
 	for _, svc := range p.Services {
-		if strings.HasPrefix(r.URL.Path, parsePrefix(svc.Rule)) {
+		if strings.HasPrefix(r.URL.Path, svc.PathPrefix()) {
 			return svc.Upstream
 		}
 	}
 
 	return ""
-}
-
-func parsePrefix(rule string) string {
-	return strings.TrimSuffix(strings.TrimPrefix(rule, "PathPrefix(`"), "`)")
 }

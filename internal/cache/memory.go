@@ -21,7 +21,6 @@ func (c *MemoryCache) Get(key string) (Entry, bool) {
 	if !ok || entry.Expired() {
 		if ok {
 			c.mu.Lock()
-			// why are we deleting?
 			delete(c.items, key)
 			c.mu.Unlock()
 		}
