@@ -51,6 +51,18 @@ func TestKey(t *testing.T) {
 			},
 			expected: "POST:http://example.com/post?",
 		},
+		{
+			name: "Query Parameter Sorting",
+			request: &http.Request{
+				Method: http.MethodGet,
+				Host:   "example.com",
+				URL: &url.URL{
+					Path:     "/search",
+					RawQuery: "q=go&page=1&sort=desc",
+				},
+			},
+			expected: "GET:http://example.com/search?page=1&q=go&sort=desc",
+		},
 	}
 
 	for _, tc := range testCases {

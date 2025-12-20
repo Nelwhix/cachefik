@@ -34,7 +34,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	target := p.pickUpstream(r)
 	if target == "" {
 		logger.Warn("no upstream found")
-		http.Error(w, "no upstream found", http.StatusNotFound)
+		sendJSONError(w, "no upstream found", http.StatusNotFound)
 		return
 	}
 
@@ -45,14 +45,14 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	resp, err := p.Client.Do(outRequest)
 	if err != nil {
 		logger.Error("upstream request failed", "error", err)
-		http.Error(w, "upstream error", http.StatusInternalServerError)
+		sendJSONError(w, "upstream error", http.StatusInternalServerError)
 		return
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		http.Error(w, "read error", http.StatusBadGateway)
+		sendJSONError(w, "read error", http.StatusBadGateway)
 		return
 	}
 

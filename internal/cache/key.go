@@ -6,13 +6,15 @@ import (
 )
 
 func Key(r *http.Request) string {
+	queryString := r.URL.Query().Encode()
+
 	return fmt.Sprintf(
 		"%s:%s://%s%s?%s",
 		r.Method,
 		scheme(r),
 		r.Host,
 		r.URL.Path,
-		r.URL.RawQuery,
+		queryString,
 	)
 }
 

@@ -60,11 +60,37 @@ func TestProxyIntegration(t *testing.T) {
 	})
 
 	t.Run("Upstream Error", func(t *testing.T) {
+		// Using a closed server to trigger a connection error
+		p := &Proxy{
+			Services: []docker.Service{
+				{Rule: "PathPrefix(`/`)", Upstream: "http://localhost:1"},
+			},
+			Client: &http.Client{
+				Timeout: 100 * time.Millisecond,
+			},
+		}
 		req := httptest.NewRequest(http.MethodGet, "/error", nil)
 		w := httptest.NewRecorder()
 
-		proxy.ServeHTTP(w, req)
+		p.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+		assert.Contains(t, w.Body.String(), `"error":"upstream error"`)
+	})
+
+	t.Run("No Upstream Found", func(t *testing.T) {
+		p := &Proxy{
+			Services: []docker.Service{},
+			Client:   &http.Client{},
+		}
+		req := httptest.NewRequest(http.MethodGet, "/not-found", nil)
+		w := httptest.NewRecorder()
+
+		p.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+		assert.Contains(t, w.Body.String(), `"error":"no upstream found"`)
+		assert.Contains(t, w.Body.String(), `"code":404`)
 	})
 
 	t.Run("TTL Expiration", func(t *testing.T) {
