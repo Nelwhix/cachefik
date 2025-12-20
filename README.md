@@ -23,7 +23,9 @@ It:
 * receives incoming HTTP requests
 * dynamically selects an upstream service
 * decides whether a request/response is cacheable
+* uses deterministic cache keys
 * serves responses either from cache or by proxying upstream
+* provides structured JSON error responses
 * exposes cache behavior via the `X-Cache` response header
 
 ---
@@ -42,7 +44,7 @@ At startup, Cachefik:
 4. Builds an in-memory routing table
 5. Applies routing rules based on request path prefixes
 
-Discovery is **startup-only** (no live reload), which keeps the implementation simple and explicit.
+Discovery is **startup-only** (no live reload).
 
 ### Label contract
 
@@ -67,8 +69,6 @@ Routes are matched by **specificity**:
 * Longer (more specific) path prefixes are evaluated first
 * For example, `/api` takes priority over `/`
 
-This mirrors Traefik’s router priority behavior and avoids order-dependent routing bugs.
-
 ### Docker socket access
 
 To enable discovery, the Docker socket is mounted read-only into the proxy container:
@@ -77,8 +77,6 @@ To enable discovery, the Docker socket is mounted read-only into the proxy conta
 volumes:
   - /var/run/docker.sock:/var/run/docker.sock:ro
 ```
-
-This is the same mechanism used by Traefik when running with the Docker provider.
 
 ---
 
@@ -205,17 +203,26 @@ Tests verify:
 * **No `net/http/httputil`**
   The proxy logic is implemented manually to make request cloning, header handling, and streaming explicit.
 
+* **Deterministic Cache Keys**
+  Query parameters are automatically sorted when generating cache keys to ensure that `?a=1&b=2` and `?b=2&a=1` are treated as the same request.
+
+* **Memory-Efficient Streaming**
+  Uses `io.TeeReader` to stream responses directly from the upstream to the client while simultaneously buffering for the cache. This minimizes latency and memory usage.
+
+* **Size-Limited Caching**
+  To prevent memory exhaustion, only responses below a configurable threshold (default 10MB) are cached. Larger responses are still proxied but not stored.
+
+* **Structured Error Responses**
+  Returns consistent JSON errors instead of plain text, improving the experience for API clients.
+
 * **Docker provider instead of static upstreams**
   Demonstrates a dynamic discovery model similar to Traefik’s provider architecture.
 
-* **In-memory cache only**
-  Chosen for simplicity and clarity. No eviction beyond TTL.
+* **In-memory cache with LRU-like eviction**
+  Uses a fixed-capacity (1000 items) in-memory storage with simple eviction to manage resource usage.
 
 * **Conservative caching defaults**
   It is safer to bypass caching than to cache incorrectly.
-
-* **No streaming cache**
-  Responses are only buffered when they are cacheable.
 
 ---
 
@@ -224,9 +231,8 @@ Tests verify:
 This project intentionally keeps scope limited. Possible extensions include:
 
 * Live Docker event watching (hot reload)
-* LRU or size-bounded cache eviction
 * Disk-backed or distributed cache
 * Support for `Vary` headers
 * Conditional requests (`ETag`, `If-Modified-Since`)
-* Structured logging and configurable log sinks
+* Configurable log sinks
 * HTTP/2 upstream support
