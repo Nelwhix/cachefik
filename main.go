@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Nelwhix/cachefik/internal/cache"
 	"github.com/Nelwhix/cachefik/internal/config"
@@ -31,7 +33,10 @@ func main() {
 	slog.SetDefault(logger)
 	slog.Info("Starting Cachefik", "addr", cfg.Addr, "log_level", cfg.LogLevel)
 
-	services, err := docker.DiscoverServices(cfg.DockerHost, cfg.DockerVersion)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	services, err := docker.DiscoverServices(ctx, cfg.DockerHost, cfg.DockerVersion)
 	if err != nil {
 		slog.Error("Docker discovery failed", "error", err)
 		os.Exit(1)

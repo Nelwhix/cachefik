@@ -11,7 +11,7 @@ import (
 	"github.com/docker/docker/client"
 )
 
-func DiscoverServices(host string, version string) ([]Service, error) {
+func DiscoverServices(ctx context.Context, host string, version string) ([]Service, error) {
 	opts := []client.Opt{
 		client.FromEnv,
 	}
@@ -28,7 +28,7 @@ func DiscoverServices(host string, version string) ([]Service, error) {
 	}
 	defer cli.Close()
 
-	return listServices(context.Background(), cli)
+	return listServices(ctx, cli)
 }
 
 func listServices(ctx context.Context, cli client.ContainerAPIClient) ([]Service, error) {

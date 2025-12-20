@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -40,9 +41,35 @@ func TestMemoryCache(t *testing.T) {
 		_, ok := c.Get("expired_key")
 		assert.False(t, ok)
 
-		c.mu.RLock()
+		c.mu.Lock()
 		_, ok = c.items["expired_key"]
-		c.mu.RUnlock()
+		c.mu.Unlock()
 		assert.False(t, ok)
+	})
+
+	t.Run("LRU Eviction", func(t *testing.T) {
+		c := NewMemoryCache()
+		// Fill it up to capacity (1000)
+		for i := 0; i < 1000; i++ {
+			c.Set(fmt.Sprintf("key%d", i), Entry{ExpiresAt: time.Now().Add(1 * time.Hour)})
+		}
+
+		// Access key0, so it's now the most recently used
+		c.Get("key0")
+
+		// Add one more, which should trigger eviction of key1 (the next oldest)
+		c.Set("new", Entry{ExpiresAt: time.Now().Add(1 * time.Hour)})
+
+		// key0 should still be there
+		_, ok := c.Get("key0")
+		assert.True(t, ok)
+
+		// key1 should be gone
+		_, ok = c.Get("key1")
+		assert.False(t, ok)
+
+		// newest one should be there
+		_, ok = c.Get("new")
+		assert.True(t, ok)
 	})
 }

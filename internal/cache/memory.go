@@ -1,38 +1,68 @@
 package cache
 
-import "sync"
+import (
+	"container/list"
+	"sync"
+)
+
+type cacheItem struct {
+	key   string
+	entry Entry
+}
 
 type MemoryCache struct {
-	mu    sync.RWMutex
-	items map[string]Entry
+	mu       sync.Mutex
+	capacity int
+	list     *list.List
+	items    map[string]*list.Element
 }
 
 func NewMemoryCache() *MemoryCache {
 	return &MemoryCache{
-		items: make(map[string]Entry),
+		capacity: 1000,
+		list:     list.New(),
+		items:    make(map[string]*list.Element),
 	}
 }
 
 func (c *MemoryCache) Get(key string) (Entry, bool) {
-	c.mu.RLock()
-	entry, ok := c.items[key]
-	c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	if !ok || entry.Expired() {
-		if ok {
-			c.mu.Lock()
+	if element, ok := c.items[key]; ok {
+		item := element.Value.(*cacheItem)
+		if item.entry.Expired() {
+			c.list.Remove(element)
 			delete(c.items, key)
-			c.mu.Unlock()
+			return Entry{}, false
 		}
 
-		return Entry{}, false
+		c.list.MoveToFront(element)
+		return item.entry, true
 	}
 
-	return entry, true
+	return Entry{}, false
 }
 
 func (c *MemoryCache) Set(key string, entry Entry) {
 	c.mu.Lock()
-	c.items[key] = entry
-	c.mu.Unlock()
+	defer c.mu.Unlock()
+
+	if element, ok := c.items[key]; ok {
+		c.list.MoveToFront(element)
+		element.Value.(*cacheItem).entry = entry
+		return
+	}
+
+	item := &cacheItem{key, entry}
+	element := c.list.PushFront(item)
+	c.items[key] = element
+
+	if c.list.Len() > c.capacity {
+		oldest := c.list.Back()
+		if oldest != nil {
+			c.list.Remove(oldest)
+			delete(c.items, oldest.Value.(*cacheItem).key)
+		}
+	}
 }
