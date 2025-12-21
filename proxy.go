@@ -59,7 +59,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var bodyWriter = io.Discard
 	var lw *limitedWriter
 	if canCache {
-		lw = &limitedWriter{W: &buf, Limit: p.MaxCacheSize}
+		lw = &limitedWriter{
+			W:     &buf,
+			Limit: p.MaxCacheSize,
+		}
 		bodyWriter = lw
 	}
 
@@ -143,4 +146,18 @@ func (lw *limitedWriter) Write(p []byte) (n int, err error) {
 	n, err = lw.W.Write(p)
 	lw.Written += int64(n)
 	return n, err
+}
+
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		return a + "/" + b
+	default:
+		return a + b
+	}
 }
