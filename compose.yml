@@ -3,14 +3,14 @@ services:
     build: .
     container_name: cache-proxy
     ports:
-      - "8080:8080"
+      - "8000:8000"
     depends_on:
       - frontend
       - backend
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - CACHEFIK_ADDR=:8080
+      - CACHEFIK_ADDR=:8000
       - CACHEFIK_READ_TIMEOUT=15s
       - CACHEFIK_WRITE_TIMEOUT=15s
       - CACHEFIK_PROXY_TIMEOUT=20s
